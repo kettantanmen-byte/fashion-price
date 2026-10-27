@@ -40,7 +40,6 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
 .modal.open{display:flex}
 .dialog{background:white;border-radius:10px;padding:22px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto}
 .close{float:right;padding:6px;border:0;border-radius:5px;cursor:pointer}
-.offer{padding:12px 0;border-bottom:1px solid #d8dee8;display:flex;justify-content:space-between;gap:10px}
 .product-link{display:block;margin-top:14px;padding:12px;text-align:center;background:#0759c7;color:white;text-decoration:none;border-radius:5px;font-weight:bold}
 .product-link:hover{background:#0649a3}
 @media(max-width:700px){
@@ -120,9 +119,7 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
   </div>
 </main>
 
-<footer>
-  FASHION PRICE｜ファッション価格比較
-</footer>
+<footer>FASHION PRICE｜ファッション価格比較</footer>
 
 <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
   <div class="dialog">
@@ -130,10 +127,11 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
     <h2 id="modalTitle"></h2>
     <div id="modalBrand" class="muted"></div>
     <div id="modalCode" class="code"></div>
+    <div id="modalJanCode" class="code"></div>
     <p id="modalPrice" class="price"></p>
     <div id="modalSource" class="muted"></div>
     <div class="notice">
-      商品コードは取得元から提供された値です。公式品番とは限りません。同一商品の価格比較は今後の開発対象です。
+      商品コード・JAN/ISBNコードは取得元から提供された値です。JAN/ISBNコードが一致する商品は、同一商品を照合する手がかりとして利用できます。
     </div>
     <a id="productLink" class="product-link" href="#" target="_blank" rel="noopener noreferrer">販売ページを開く</a>
   </div>
@@ -173,7 +171,8 @@ function normalizeProduct(p, i) {
     id: i,
     name: p.name || "商品名不明",
     brand: p.shop || "販売店情報なし",
-    code: p.code || "商品コードなし",
+    code: p.code || "",
+    janCode: p.janCode || "",
     gender: getGender(p.name || ""),
     category: getCategory(p.name || ""),
     price: Number(p.price) || 0,
@@ -195,7 +194,6 @@ async function render() {
   const gender = document.getElementById("gender").value;
   const sort = document.getElementById("sort").value;
   const count = document.getElementById("count");
-
   const root = document.getElementById("products");
   const thisRequest = ++requestNumber;
 
@@ -223,13 +221,8 @@ async function render() {
       .map(normalizeProduct)
       .filter(p => p.price > 0);
 
-    if (category) {
-      products = products.filter(p => p.category === category);
-    }
-
-    if (gender) {
-      products = products.filter(p => p.gender === gender);
-    }
+    if (category) products = products.filter(p => p.category === category);
+    if (gender) products = products.filter(p => p.gender === gender);
 
     if (sort === "low") {
       products.sort((a, b) => a.price - b.price);
@@ -258,7 +251,8 @@ async function render() {
         <div class="body">
           <div class="brand">${escapeHTML(p.brand)}</div>
           <div class="name">${escapeHTML(p.name)}</div>
-          <div class="code">商品コード：${escapeHTML(p.code)}</div>
+          <div class="code">商品コード：${escapeHTML(p.code || "未登録")}</div>
+          <div class="code">JAN/ISBNコード：${escapeHTML(p.janCode || "未登録")}</div>
           <div class="price">${yen(p.price)}</div>
           <div class="muted">販売先：${escapeHTML(p.source)}</div>
           <span class="chip">${escapeHTML(p.category)} · ${escapeHTML(p.gender)}</span>
@@ -274,7 +268,10 @@ async function render() {
 
         document.getElementById("modalTitle").textContent = p.name;
         document.getElementById("modalBrand").textContent = p.brand;
-        document.getElementById("modalCode").textContent = "商品コード：" + p.code;
+        document.getElementById("modalCode").textContent =
+          "商品コード：" + (p.code || "未登録");
+        document.getElementById("modalJanCode").textContent =
+          "JAN/ISBNコード：" + (p.janCode || "未登録");
         document.getElementById("modalPrice").textContent = yen(p.price);
         document.getElementById("modalSource").textContent = "販売先：" + p.source;
 
@@ -294,7 +291,6 @@ async function render() {
 
   } catch (error) {
     if (thisRequest !== requestNumber) return;
-
     count.textContent = "検索エラー";
     showMessage(
       (error.message || "商品を取得できませんでした。") +
