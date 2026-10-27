@@ -28,9 +28,9 @@ h1{font-size:24px;margin:12px 0 5px}
 .body{padding:14px;display:flex;flex-direction:column;flex:1;min-width:0}
 .brand{font-size:12px;color:#5d6675}
 .name{font-weight:bold;margin:4px 0 8px;overflow-wrap:anywhere}
-.code{font-size:12px;color:#5d6675;margin:4px 0 8px;overflow-wrap:anywhere}
-.price{font-size:22px;font-weight:bold;margin:4px 0}
-.price small{font-size:11px;color:#5d6675;font-weight:normal}
+.code{font-size:12px;color:#5d6675;margin:4px 0;overflow-wrap:anywhere}
+.brand-code{font-size:13px;color:#171a21;font-weight:bold}
+.price{font-size:22px;font-weight:bold;margin:8px 0}
 .chip{font-size:11px;background:#eef2f7;padding:3px 7px;border-radius:4px;align-self:flex-start;margin-top:8px}
 .detail{margin-top:13px;padding:9px;border:1px solid #0759c7;background:white;color:#0759c7;border-radius:5px;font-weight:bold;cursor:pointer}
 .detail:hover{background:#f0f6ff}
@@ -73,7 +73,7 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
   <div class="muted">商品名やブランド名で検索して、価格をチェック。</div>
 
   <form class="search" id="searchForm">
-    <input id="query" type="search" placeholder="例：デニム、バッグ、AZUL、ワイドパンツ" aria-label="商品名やブランド名">
+    <input id="query" type="search" placeholder="例：デニム、バッグ、AZUL、ブランド品番" aria-label="商品名やブランド名">
     <button type="submit">検索</button>
   </form>
 
@@ -87,7 +87,6 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
         <option value="シューズ">シューズ</option>
       </select>
     </label>
-
     <label>対象
       <select id="gender">
         <option value="">すべて</option>
@@ -95,7 +94,6 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
         <option value="メンズ">メンズ</option>
       </select>
     </label>
-
     <label>並び順
       <select id="sort">
         <option value="relevance">おすすめ順</option>
@@ -106,7 +104,7 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
   </div>
 
   <div class="notice">
-    Yahoo!ショッピングから取得した商品情報を表示します。価格・在庫・販売状況は販売ページでご確認ください。
+    商品のブランド品番を同一商品の照合に活用するための試作版です。価格・在庫・販売状況は販売ページでご確認ください。
   </div>
 
   <div class="head">
@@ -127,11 +125,12 @@ footer{text-align:center;border-top:1px solid #d8dee8;padding:20px;color:#5d6675
     <h2 id="modalTitle"></h2>
     <div id="modalBrand" class="muted"></div>
     <div id="modalCode" class="code"></div>
+    <div id="modalBrandCode" class="code brand-code"></div>
     <div id="modalJanCode" class="code"></div>
     <p id="modalPrice" class="price"></p>
     <div id="modalSource" class="muted"></div>
     <div class="notice">
-      商品コード・JAN/ISBNコードは取得元から提供された値です。JAN/ISBNコードが一致する商品は、同一商品を照合する手がかりとして利用できます。
+      ブランド品番は同一商品を照合するための手がかりです。品番が一致しても、カラー・サイズなどの違いを確認してください。
     </div>
     <a id="productLink" class="product-link" href="#" target="_blank" rel="noopener noreferrer">販売ページを開く</a>
   </div>
@@ -172,6 +171,7 @@ function normalizeProduct(p, i) {
     name: p.name || "商品名不明",
     brand: p.shop || "販売店情報なし",
     code: p.code || "",
+    brandCode: p.brandCode || "",
     janCode: p.janCode || "",
     gender: getGender(p.name || ""),
     category: getCategory(p.name || ""),
@@ -212,10 +212,7 @@ async function render() {
     const data = await response.json();
 
     if (thisRequest !== requestNumber) return;
-
-    if (!response.ok) {
-      throw new Error(data.error || "商品を取得できませんでした。");
-    }
+    if (!response.ok) throw new Error(data.error || "商品を取得できませんでした。");
 
     let products = (data.items || [])
       .map(normalizeProduct)
@@ -224,11 +221,8 @@ async function render() {
     if (category) products = products.filter(p => p.category === category);
     if (gender) products = products.filter(p => p.gender === gender);
 
-    if (sort === "low") {
-      products.sort((a, b) => a.price - b.price);
-    } else if (sort === "high") {
-      products.sort((a, b) => b.price - a.price);
-    }
+    if (sort === "low") products.sort((a, b) => a.price - b.price);
+    if (sort === "high") products.sort((a, b) => b.price - a.price);
 
     currentItems = products;
     count.textContent = products.length + "件（検索結果）";
@@ -251,8 +245,9 @@ async function render() {
         <div class="body">
           <div class="brand">${escapeHTML(p.brand)}</div>
           <div class="name">${escapeHTML(p.name)}</div>
-          <div class="code">商品コード：${escapeHTML(p.code || "未登録")}</div>
-          <div class="code">JAN/ISBNコード：${escapeHTML(p.janCode || "未登録")}</div>
+          <div class="code">商品コード：${escapeHTML(p.code || "未取得")}</div>
+          <div class="code brand-code">ブランド品番：${escapeHTML(p.brandCode || "未取得")}</div>
+          <div class="code">JAN/ISBNコード：${escapeHTML(p.janCode || "未取得")}</div>
           <div class="price">${yen(p.price)}</div>
           <div class="muted">販売先：${escapeHTML(p.source)}</div>
           <span class="chip">${escapeHTML(p.category)} · ${escapeHTML(p.gender)}</span>
@@ -269,14 +264,15 @@ async function render() {
         document.getElementById("modalTitle").textContent = p.name;
         document.getElementById("modalBrand").textContent = p.brand;
         document.getElementById("modalCode").textContent =
-          "商品コード：" + (p.code || "未登録");
+          "商品コード：" + (p.code || "未取得");
+        document.getElementById("modalBrandCode").textContent =
+          "ブランド品番：" + (p.brandCode || "未取得");
         document.getElementById("modalJanCode").textContent =
-          "JAN/ISBNコード：" + (p.janCode || "未登録");
+          "JAN/ISBNコード：" + (p.janCode || "未取得");
         document.getElementById("modalPrice").textContent = yen(p.price);
         document.getElementById("modalSource").textContent = "販売先：" + p.source;
 
         const link = document.getElementById("productLink");
-
         if (p.url && /^https?:\/\//i.test(p.url)) {
           link.href = p.url;
           link.style.display = "block";
@@ -292,10 +288,7 @@ async function render() {
   } catch (error) {
     if (thisRequest !== requestNumber) return;
     count.textContent = "検索エラー";
-    showMessage(
-      (error.message || "商品を取得できませんでした。") +
-      " 時間をおいて再度お試しください。"
-    );
+    showMessage((error.message || "商品を取得できませんでした。") + " 時間をおいて再度お試しください。");
   }
 }
 
@@ -313,15 +306,11 @@ document.getElementById("close").addEventListener("click", () => {
 });
 
 document.getElementById("modal").addEventListener("click", event => {
-  if (event.target.id === "modal") {
-    event.currentTarget.classList.remove("open");
-  }
+  if (event.target.id === "modal") event.currentTarget.classList.remove("open");
 });
 
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") {
-    document.getElementById("modal").classList.remove("open");
-  }
+  if (event.key === "Escape") document.getElementById("modal").classList.remove("open");
 });
 </script>
 </body>
