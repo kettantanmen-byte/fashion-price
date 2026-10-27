@@ -23,7 +23,123 @@ const items=[
 {id:8,brand:"参考商品",name:"ストレートスラックス",category:"パンツ",gender:"メンズ",price:5500},
 {id:9,brand:"参考商品",name:"クルーネックニット",category:"トップス",gender:"レディース",price:4950}];
 const yen=n=>"¥"+n.toLocaleString("ja-JP");
-function render(){const q=document.getElementById("query").value.trim().toLowerCase(),c=document.getElementById("category").value,g=document.getElementById("gender").value,s=document.getElementById("sort").value;let a=items.filter(p=>(!q||(p.name+" "+p.brand+" "+p.category+" "+p.gender).toLowerCase().includes(q))&&(!c||p.category===c)&&(!g||p.gender===g));if(s==="low")a.sort((x,y)=>x.price-y.price);if(s==="high")a.sort((x,y)=>y.price-x.price);document.getElementById("count").textContent=a.length+"件（サンプル）";const root=document.getElementById("products");if(!a.length){root.className="";root.innerHTML='<div class="empty">該当する商品がありません。別のキーワードで検索してみてください。</div>';return}root.className="grid";root.innerHTML=a.map(p=>`<article class="card"><div class="photo">商品画像（準備中）</div><div class="body"><div class="brand">${p.brand}・${p.gender}</div><div class="name">${p.name}</div><div class="price">${yen(p.price)} <small>サンプル</small></div><div class="muted">カテゴリ：${p.category}</div><span class="chip">試作データ</span><button class="detail" data-id="${p.id}">商品情報を見る</button></div></article>`).join("");root.querySelectorAll("button").forEach(b=>b.onclick=()=>detail(+b.dataset.id))}
-function detail(id){const p=items.find(x=>x.id===id);document.getElementById("modalTitle").textContent=p.name;document.getElementById("modalBrand").textContent=p.brand+"・"+p.gender;document.getElementById("modalPrice").textContent=yen(p.price)+"（サンプル）";document.getElementById("offers").innerHTML='<div class="offer"><span>サンプル価格</span><strong>'+yen(p.price)+'</strong></div>';document.getElementById("modal").classList.add("open")}
-document.getElementById("searchForm").onsubmit=e=>{e.preventDefault();render()};["category","gender","sort"].forEach(id=>document.getElementById(id).onchange=render);document.getElementById("close").onclick=()=>document.getElementById("modal").classList.remove("open");document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")e.currentTarget.classList.remove("open")};render();
+
+async function render(){
+  const q=document.getElementById("query").value.trim();
+  const c=document.getElementById("category").value;
+  const g=document.getElementById("gender").value;
+  const s=document.getElementById("sort").value;
+  const root=document.getElementById("products");
+  const count=document.getElementById("count");
+
+  if(!q){
+    count.textContent="キーワードを入力してください";
+    root.className="";
+    root.innerHTML='<div class="empty">商品名やブランド名を入力して検索してください。</div>';
+    return;
+  }
+
+  count.textContent="検索中...";
+  root.className="";
+  root.innerHTML='<div class="empty">商品情報を取得しています...</div>';
+
+  try{
+    const response=await fetch(
+      "https://blue-dew-5ca2.kettantanmen.workers.dev/api/search?q="+encodeURIComponent(q)
+    );
+    const data=await response.json();
+
+    if(!response.ok) throw new Error(data.error||"商品を取得できませんでした");
+
+    let a=(data.items||[]).map((p,i)=>({
+      id:i,
+      name:p.name||"商品名不明",
+      brand:p.shop||"販売店情報なし",
+      gender:/メンズ|男性用/i.test(p.name)?"メンズ":
+        /レディース|女性用|婦人/i.test(p.name)?"レディース":"不明",
+      category:/バッグ/i.test(p.name)?"バッグ":
+        /シューズ|スニーカー|パンプス|ブーツ/i.test(p.name)?"シューズ":
+        /パンツ|デニム|ジーンズ|スラックス/i.test(p.name)?"パンツ":"トップス",
+      price:Number(p.price)||0,
+      image:p.image||"",
+      url:p.url||"",
+      source:p.source||"Yahoo!ショッピング"
+    }));
+
+    if(c) a=a.filter(p=>p.category===c);
+    if(g) a=a.filter(p=>p.gender===g);
+    if(s==="low") a.sort((x,y)=>x.price-y.price);
+    if(s==="high") a.sort((x,y)=>y.price-x.price);
+
+    count.textContent=a.length+"件（Yahoo!ショッピング検索結果）";
+
+    if(!a.length){
+      root.innerHTML='<div class="empty">該当する商品がありません。カテゴリと対象を「すべて」にするか、別のキーワードで検索してください。</div>';
+      return;
+    }
+
+    const escapeHTML=v=>String(v).replace(/[&<>"']/g,ch=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[ch]));
+
+    root.className="grid";
+    root.innerHTML=a.map(p=>`
+      <article class="card">
+        <div class="photo">${
+          p.image
+            ? '<img src="'+escapeHTML(p.image)+'" alt="" style="width:100%;height:100%;object-fit:contain">'
+            : '商品画像なし'
+        }</div>
+        <div class="body">
+          <div class="brand">${escapeHTML(p.brand)}</div>
+          <div class="name">${escapeHTML(p.name)}</div>
+          <div class="price">${yen(p.price)}</div>
+          <div class="muted">販売先：${escapeHTML(p.source)}</div>
+          <span class="chip">検索結果</span>
+          <button class="detail" data-id="${p.id}">商品情報を見る</button>
+        </div>
+      </article>
+    `).join("");
+
+    root.querySelectorAll(".detail").forEach(b=>{
+      b.onclick=()=>{
+        const p=a.find(x=>x.id===Number(b.dataset.id));
+        if(!p)return;
+
+        document.getElementById("modalTitle").textContent=p.name;
+        document.getElementById("modalBrand").textContent=p.brand;
+        document.getElementById("modalPrice").textContent=yen(p.price);
+        document.getElementById("offers").innerHTML=
+          '<div class="offer"><span>'+escapeHTML(p.source)+'</span><strong>'+yen(p.price)+'</strong></div>'+
+          (p.url?'<p><a href="'+escapeHTML(p.url)+'" target="_blank" rel="noopener noreferrer">販売ページを開く</a></p>':'');
+        document.getElementById("modal").classList.add("open");
+      };
+    });
+
+  }catch(error){
+    count.textContent="検索エラー";
+    root.innerHTML='<div class="empty">商品を取得できませんでした。<br><br>'+
+      String(error.message||error).replace(/[&<>"']/g,"")+
+      '<br><br>時間をおいて再度お試しください。</div>';
+  }
+}
+
+function detail(id){
+  render();
+}
+
+document.getElementById("searchForm").onsubmit=e=>{
+  e.preventDefault();
+  render();
+};
+["category","gender","sort"].forEach(id=>{
+  document.getElementById(id).onchange=render;
+});
+document.getElementById("close").onclick=()=>{
+  document.getElementById("modal").classList.remove("open");
+};
+document.getElementById("modal").onclick=e=>{
+  if(e.target.id==="modal")e.currentTarget.classList.remove("open");
+};
+render();
 </script></body></html>
