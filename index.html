@@ -53,9 +53,10 @@ async function render(){
 
     let a=(data.items||[]).map((p,i)=>({
       id:i,
-      name:p.name||"商品名不明",
-      brand:p.shop||"販売店情報なし",
-      gender:/メンズ|男性用/i.test(p.name)?"メンズ":
+name:p.name||"商品名不明",
+brand:p.shop||"販売店情報なし",
+code:p.code||"商品コードなし",
+gender:/メンズ|男性用/i.test(p.name)?"メンズ":
         /レディース|女性用|婦人/i.test(p.name)?"レディース":"不明",
       category:/バッグ/i.test(p.name)?"バッグ":
         /シューズ|スニーカー|パンプス|ブーツ/i.test(p.name)?"シューズ":
